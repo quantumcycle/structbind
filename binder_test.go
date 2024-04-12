@@ -13,6 +13,10 @@ type TestStruct struct {
 	Header1 string `bind:"header=header1"`
 }
 
+type TestDifferentNamesStruct struct {
+	IncludeValues bool `bind:"query=include_values"`
+}
+
 func createHttpRequestBinder() *structbind.Binder[*http.Request] {
 	b := structbind.NewBinder[*http.Request]()
 	b.AddBinding("query", func(name string, req *http.Request) (any, error) {
@@ -82,4 +86,20 @@ func TestBindReturnAnErrorOnInvalidTypeBinding(t *testing.T) {
 	}
 	err = b.Bind(mockReq, &result)
 	assert.Error(t, err)
+}
+
+func TestBindOnStructWithDifferentName(t *testing.T) {
+	b := createHttpRequestBinder()
+	mockReq, err := http.NewRequest("GET", "http://example.com?include_values=true", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result := TestDifferentNamesStruct{}
+	err = b.Bind(mockReq, &result)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, true, result.IncludeValues)
 }

@@ -41,9 +41,10 @@ func (b *Binder[T]) buildValues(req T, target interface{}) (map[string]any, erro
 	targetValue := reflect.ValueOf(target).Elem()
 	typeOfTarget := targetValue.Type()
 	for i := 0; i < targetValue.NumField(); i++ {
-		fieldTag := typeOfTarget.Field(i).Tag
+		field := typeOfTarget.Field(i)
+		fieldTag := field.Tag
 		if bindDefinition, ok := fieldTag.Lookup("bind"); ok {
-			err := b.extractValue(bindDefinition, req, &mapValues)
+			err := b.extractValue(bindDefinition, field.Name, req, &mapValues)
 			if err != nil {
 				return nil, err
 			}
@@ -52,7 +53,7 @@ func (b *Binder[T]) buildValues(req T, target interface{}) (map[string]any, erro
 	return mapValues, nil
 }
 
-func (b *Binder[T]) extractValue(definition string, req T, m *map[string]any) error {
+func (b *Binder[T]) extractValue(definition, fieldName string, req T, m *map[string]any) error {
 	binding, name, err := b.parseDefinition(definition)
 	if err != nil {
 		return err
@@ -66,7 +67,7 @@ func (b *Binder[T]) extractValue(definition string, req T, m *map[string]any) er
 		return err
 	}
 	if value != nil {
-		(*m)[name] = value
+		(*m)[fieldName] = value
 	}
 	return nil
 }
