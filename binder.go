@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-type Extractor[T any] func(name string, source T) (any, error)
+type Extractor[T any] func(hint string, targetType reflect.Type, source T) (any, error)
 
 type Binder[T any] struct {
 	bindings map[string]Extractor[T]
@@ -44,7 +44,7 @@ func (b *Binder[T]) buildValues(req T, target interface{}) (map[string]any, erro
 		field := typeOfTarget.Field(i)
 		fieldTag := field.Tag
 		if bindDefinition, ok := fieldTag.Lookup("bind"); ok {
-			err := b.extractValue(bindDefinition, field.Name, req, &mapValues)
+			err := b.extractValue(bindDefinition, field.Name, field.Type, req, &mapValues)
 			if err != nil {
 				return nil, err
 			}
@@ -53,8 +53,8 @@ func (b *Binder[T]) buildValues(req T, target interface{}) (map[string]any, erro
 	return mapValues, nil
 }
 
-func (b *Binder[T]) extractValue(definition, fieldName string, req T, m *map[string]any) error {
-	binding, name, err := b.parseDefinition(definition)
+func (b *Binder[T]) extractValue(definition, fieldName string, targetType reflect.Type, req T, m *map[string]any) error {
+	binding, hint, err := b.parseDefinition(definition)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (b *Binder[T]) extractValue(definition, fieldName string, req T, m *map[str
 	if !found {
 		return fmt.Errorf("no registered binding for: %s", binding)
 	}
-	value, err := extractor(name, req)
+	value, err := extractor(hint, targetType, req)
 	if err != nil {
 		return err
 	}
@@ -74,8 +74,12 @@ func (b *Binder[T]) extractValue(definition, fieldName string, req T, m *map[str
 
 func (b *Binder[T]) parseDefinition(definition string) (string, string, error) {
 	strs := strings.Split(definition, "=")
-	if len(strs) != 2 {
-		return "", "", fmt.Errorf("invalid binding definition: %s. should be [binding=name]", definition)
+	if len(strs) == 1 {
+		//no hint
+		return strs[0], "", nil
 	}
-	return strs[0], strs[1], nil
+	if len(strs) == 2 {
+		return strs[0], strs[1], nil
+	}
+	return "", "", fmt.Errorf("invalid binding definition: %s. should be [binding=hint]", definition)
 }
