@@ -40,17 +40,43 @@ func (b *Binder[T]) buildValues(req T, target interface{}) (map[string]any, erro
 	mapValues := make(map[string]any)
 	targetValue := reflect.ValueOf(target).Elem()
 	typeOfTarget := targetValue.Type()
+
+	err := b.processFields(req, targetValue, typeOfTarget, &mapValues)
+	if err != nil {
+		return nil, err
+	}
+
+	return mapValues, nil
+}
+
+func (b *Binder[T]) processFields(req T, targetValue reflect.Value, typeOfTarget reflect.Type, mapValues *map[string]any) error {
 	for i := 0; i < targetValue.NumField(); i++ {
 		field := typeOfTarget.Field(i)
+
+		// Process regular fields with "bind" tags
 		fieldTag := field.Tag
 		if bindDefinition, ok := fieldTag.Lookup("bind"); ok {
-			err := b.extractValue(bindDefinition, field.Name, field.Type, req, &mapValues)
+			err := b.extractValue(bindDefinition, field.Name, field.Type, req, mapValues)
 			if err != nil {
-				return nil, err
+				return err
 			}
+			continue
+		}
+
+		//If the field doesnt have a bind definition and it's a struct, we deep dive
+		if field.Type.Kind() == reflect.Struct {
+			embeddedValue := targetValue.Field(i)
+			embeddedType := field.Type
+			embeddedValues := make(map[string]any)
+			(*mapValues)[field.Name] = embeddedValues
+			err := b.processFields(req, embeddedValue, embeddedType, &embeddedValues)
+			if err != nil {
+				return err
+			}
+			continue
 		}
 	}
-	return mapValues, nil
+	return nil
 }
 
 func (b *Binder[T]) extractValue(definition, fieldName string, targetType reflect.Type, req T, m *map[string]any) error {
