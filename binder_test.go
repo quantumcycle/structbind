@@ -24,6 +24,16 @@ type TestInputWithBody struct {
 	Body Person `bind:"body"`
 }
 
+type ToBeEmbedded struct {
+	SubParam1 string `bind:"query=sub_param1"`
+}
+
+type TestStructWithEmbedded struct {
+	Embedded ToBeEmbedded
+	Param1   int    `bind:"query=param1"`
+	Header1  string `bind:"header=header1"`
+}
+
 type Person struct {
 	Field1 string `json:"field1"`
 	Field2 int    `json:"field2"`
@@ -69,6 +79,31 @@ func TestBindAllValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	assert.Equal(t, 23, result.Param1)
+	assert.Equal(t, "override", result.Header1)
+}
+
+func TestBindAllValuesWithEmbedding(t *testing.T) {
+	b := createHttpRequestBinder()
+	mockReq, err := http.NewRequest("GET", "http://example.com?param1=23&sub_param1=subvalue1", nil)
+	mockReq.Header.Set("header1", "override")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result := TestStructWithEmbedded{
+		Embedded: ToBeEmbedded{
+			SubParam1: "",
+		},
+		Param1:  1,
+		Header1: "default",
+	}
+	err = b.Bind(mockReq, &result)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, "subvalue1", result.Embedded.SubParam1)
 	assert.Equal(t, 23, result.Param1)
 	assert.Equal(t, "override", result.Header1)
 }
